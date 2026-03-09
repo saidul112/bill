@@ -1,0 +1,22 @@
+INSTALLATION & RUNNING
+=======================
+
+1. Extract the bill_splitter folder
+2. Open terminal in the bill_splitter directory
+3. Run: ./run.sh
+
+The application will:
+- Create a virtual environment
+- Install dependencies
+- Start on http://localhost:5000
+
+Default port: 5000
+Database: SQLite (bill_splitter.db)
+
+MANUAL INSTALLATION
+===================
+
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python app.py

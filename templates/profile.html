@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}{{ profile.name }} - Bill Splitter{% endblock %}
+
+{% block content %}
+<div class="container main-content">
+    <div class="header">
+        <h1>{{ profile.name }}</h1>
+        <p>Manage roommates, bills, and track payments</p>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="card-title">Roommates</div>
+            <div class="roommate-list" id="roommateList">
+                {% for roommate in roommates %}
+                <div class="roommate-tag">
+                    {{ roommate.name }}
+                    <button onclick="removeRoommate({{ roommate.id }})">×</button>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="input-group" style="margin-top: 20px;">
+                <label>Add New Roommate</label>
+                <div class="btn-group">
+                    <input type="text" id="newRoommateName" placeholder="Enter name">
+                    <button class="btn btn-primary" onclick="addRoommate()">+ Add</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Quick Actions</div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="openModal('billModal')">+ Add Bill</button>
+                <button class="btn btn-primary" onclick="openModal('adjustmentModal')">⚙️ Add Adjustment</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Payment Summary</div>
+        <div class="summary-grid">
+            {% for member, data in summary.items() %}
+            <div class="summary-item">
+                <div class="summary-name">{{ member }}</div>
+                <div class="summary-amount {% if data.balance < 0 %}positive{% elif data.balance > 0 %}negative{% endif %}">
+                    {% if data.balance < 0 %}
+                        Gets back: ¥{{ "%.2f"|format(-data.balance) }}
+                    {% elif data.balance > 0 %}
+                        Owes: ¥{{ "%.2f"|format(data.balance) }}
+                    {% else %}
+                        Settled up ✓
+                    {% endif %}
+                </div>
+                <div class="summary-breakdown">
+                    <strong>Total bills:</strong> ¥{{ "%.2f"|format(data.total) }}<br>
+                    <strong>Already paid:</strong> ¥{{ "%.2f"|format(data.paid) }}
+                </div>
+                {% if data.bills_breakdown %}
+                <div class="summary-breakdown" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+                    {% for bill_type, amount in data.bills_breakdown.items() %}
+                    <div>{{ bill_type }}: ¥{{ "%.2f"|format(amount) }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="card-title">Bills</div>
+            <div id="billsList">
+                {% if bills %}
+                    {% for bill in bills %}
+                    <div class="bill-item">
+                        <div class="bill-header">
+                            <div>
+                                <div class="bill-type">
+                                    {{ bill.bill_type }}
+                                    {% if bill.sub_type %}- {{ bill.sub_type }}{% endif %}
+                                </div>
+                                <div class="bill-details">
+                                    📅 {{ bill.from_date }} to {{ bill.to_date }} 
+                                    <strong>({{ bill.get_total_days() }} days)</strong>
+                                </div>
+                                {% if bill.description %}
+                                <div class="bill-details">{{ bill.description }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="bill-amount">¥{{ "%.2f"|format(bill.amount) }}</div>
+                        </div>
+                        <div class="bill-tags">
+                            <span class="tag tag-paid">Paid by: {{ bill.paid_by }}</span>
+                            {% if bill.already_paid %}
+                            <span class="tag tag-paid">✓ Already Settled</span>
+                            {% else %}
+                            <span class="tag tag-pending">Pending Split</span>
+                            {% endif %}
+                            {% if bill.get_excluded_members() %}
+                            <span class="tag" style="background: var(--danger); color: white;">
+                                Excluded: {{ bill.get_excluded_members()|join(', ') }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="btn-group" style="margin-top: 12px;">
+                            <button class="btn btn-secondary" onclick="editBill({{ bill.id }})">Edit</button>
+                            <button class="btn btn-danger" onclick="deleteBill({{ bill.id }})">Delete</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="empty-state">
+                    <p>No bills added yet</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Usage Adjustments</div>
+            <div id="adjustmentsList">
+                {% if adjustments %}
+                    {% for adj in adjustments %}
+                    <div class="adjustment-item">
+                        <div class="adjustment-header">
+                            <div class="adjustment-title">{{ adj.member }} - {{ adj.bill_type }}</div>
+                            <div class="btn-group">
+                                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="editAdjustment({{ adj.id }})">Edit</button>
+                                <button class="btn btn-danger" onclick="deleteAdjustment({{ adj.id }})">×</button>
+                            </div>
+                        </div>
+                        <div class="bill-details">
+                            🏖️ Absent: {{ adj.from_date }} to {{ adj.to_date }}
+                            <strong>({{ adj.get_total_days() }} days)</strong><br>
+                            Reason: {{ adj.reason }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="empty-state">
+                    <p>No adjustments added yet</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Simple Summary -->
+    <div class="simple-summary">
+        <div class="simple-summary-title">💰 Total Per Member</div>
+        <div class="simple-summary-grid">
+            {% for member, data in summary.items() %}
+            <div class="simple-summary-item">
+                <div class="simple-summary-name">{{ member }}</div>
+                <div class="simple-summary-amount">
+                    {% if data.balance < 0 %}
+                        -¥{{ "%.2f"|format(-data.balance) }}
+                    {% elif data.balance > 0 %}
+                        ¥{{ "%.2f"|format(data.balance) }}
+                    {% else %}
+                        ¥0.00
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Modals -->
+<div id="billModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title" id="billModalTitle">Add New Bill</div>
+            <button class="close-modal" onclick="closeModal('billModal')">×</button>
+        </div>
+        <form id="billForm" onsubmit="saveBill(event)">
+            <input type="hidden" id="billId" value="">
+            <div class="input-group">
+                <label>Bill Type</label>
+                <select id="billType" required onchange="toggleSubType()">
+                    <option value="">Select type</option>
+                    <option value="Gas">Gas</option>
+                    <option value="Electricity">Electricity</option>
+                    <option value="Water">Water</option>
+                    <option value="Extras">Extras</option>
+                </select>
+            </div>
+            <div class="input-group" id="subTypeGroup" style="display: none;">
+                <label>Sub-Type (for Extras)</label>
+                <input type="text" id="billSubType" placeholder="e.g., Tissue, Cleaning supplies">
+            </div>
+            <div class="input-group">
+                <label>Amount (¥)</label>
+                <input type="number" id="billAmount" step="0.01" min="0" required>
+            </div>
+            <div class="form-row">
+                <div class="input-group">
+                    <label>From Date</label>
+                    <input type="date" id="billFromDate" required>
+                </div>
+                <div class="input-group">
+                    <label>To Date</label>
+                    <input type="date" id="billToDate" required>
+                </div>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="billAlreadyPaid" onchange="togglePaidBy()">
+                <label style="margin: 0;">Already paid</label>
+            </div>
+            <div class="input-group" id="paidByGroup" style="display: none;">
+                <label>Paid By</label>
+                <select id="billPaidBy">
+                    <option value="">Select roommate</option>
+                    {% for roommate in roommates %}
+                    <option value="{{ roommate.name }}">{{ roommate.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Description (optional)</label>
+                <textarea id="billDescription" rows="2"></textarea>
+            </div>
+            <div class="input-group">
+                <label>Exclude Members (optional)</label>
+                <div class="checkbox-list" id="excludeMembersCheckboxes">
+                    {% for roommate in roommates %}
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="excludeMembers" value="{{ roommate.name }}">
+                        {{ roommate.name }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <small style="color: var(--text-muted); font-size: 12px;">Select members who should NOT be included in this bill</small>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;" id="billSubmitBtn">Add Bill</button>
+        </form>
+    </div>
+</div>
+
+<div id="adjustmentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title" id="adjustmentModalTitle">Add Usage Adjustment</div>
+            <button class="close-modal" onclick="closeModal('adjustmentModal')">×</button>
+        </div>
+        <form id="adjustmentForm" onsubmit="saveAdjustment(event)">
+            <input type="hidden" id="adjId" value="">
+            <div class="input-group">
+                <label>Member</label>
+                <select id="adjMember" required>
+                    <option value="">Select roommate</option>
+                    {% for roommate in roommates %}
+                    <option value="{{ roommate.name }}">{{ roommate.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Bill Type to Adjust</label>
+                <select id="adjBillType" required>
+                    <option value="">Select bill type</option>
+                    <option value="Gas">Gas</option>
+                    <option value="Electricity">Electricity</option>
+                    <option value="Water">Water</option>
+                    <option value="Extras">Extras</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="input-group">
+                    <label>Absent From</label>
+                    <input type="date" id="adjFromDate" required>
+                </div>
+                <div class="input-group">
+                    <label>Absent To</label>
+                    <input type="date" id="adjToDate" required>
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Reason</label>
+                <textarea id="adjReason" rows="2" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;" id="adjSubmitBtn">Add Adjustment</button>
+        </form>
+    </div>
+</div>
+
+<script>
+const profileId = {{ profile.id }};
+const billsData = {{ bills_data|tojson }};
+const adjustmentsData = {{ adjustments_data|tojson }};
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/profile.js') }}"></script>
+{% endblock %}

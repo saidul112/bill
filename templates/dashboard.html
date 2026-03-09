@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Bill Splitter{% endblock %}
+
+{% block content %}
+<div class="container main-content">
+    <div class="page-header">
+        <h1>📊 Dashboard</h1>
+        <a href="{{ url_for('profiles.create') }}" class="btn btn-primary">+ New Profile</a>
+    </div>
+    
+    <!-- Profiles Grid -->
+    {% if profiles %}
+        {% for profile in profiles %}
+        <div class="profile-section-card">
+            <div class="profile-section-header">
+                <div class="profile-section-info">
+                    <h2 class="profile-section-title">🏠 {{ profile.name }}</h2>
+                    <div class="profile-section-meta">
+                        {{ profile.roommates|length }} roommate{{ 's' if profile.roommates|length != 1 else '' }} • 
+                        Created {{ profile.created_at.strftime('%b %d, %Y') }}
+                    </div>
+                </div>
+                <div class="profile-section-actions">
+                    <button onclick="openNewBillGroupModal({{ profile.id }}, '{{ profile.name }}')" class="btn btn-primary">+ New Month</button>
+                    <form method="POST" action="{{ url_for('profiles.delete', profile_id=profile.id) }}" style="display: inline;" onsubmit="return confirm('Delete this profile and all its data?');">
+                        <button type="submit" class="btn btn-danger">Delete Profile</button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Monthly Periods for this Profile -->
+            {% set profile_groups = profile_bill_groups.get(profile.id, []) %}
+            {% if profile_groups %}
+                <div class="monthly-periods-grid">
+                    {% for item in profile_groups %}
+                    <div class="monthly-period-card">
+                        <div class="monthly-period-header">
+                            <h3 class="monthly-period-title">📅 {{ item.group.name }}</h3>
+                            <span class="bill-count-badge">{{ item.bill_count }}</span>
+                        </div>
+                        <div class="monthly-period-date">
+                            Created {{ item.group.created_at.strftime('%b %d, %Y') }}
+                        </div>
+                        <div class="monthly-period-actions">
+                            <a href="{{ url_for('bill_groups.view', group_id=item.group.id) }}" class="btn btn-primary btn-sm">
+                                View & Edit
+                            </a>
+                            <form method="POST" action="{{ url_for('bill_groups.delete', group_id=item.group.id) }}" style="display: inline;" onsubmit="return confirm('Delete {{ item.group.name }} and all its bills?');">
+                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-monthly-state">
+                    <p>📭 No monthly periods yet</p>
+                    <button onclick="openNewBillGroupModal({{ profile.id }}, '{{ profile.name }}')" class="btn btn-primary btn-sm">
+                        Create First Month
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="card">
+            <div class="empty-state">
+                <h2>Welcome! 👋</h2>
+                <p style="color: var(--card);">Create your first profile to start tracking bills</p>
+                <a href="{{ url_for('profiles.create') }}" class="btn btn-primary">Create Your First Profile</a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- New Bill Group Modal -->
+<div id="newBillGroupModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">Create New Monthly Period</div>
+            <button class="close-modal" onclick="closeModal('newBillGroupModal')">×</button>
+        </div>
+        <form method="POST" action="{{ url_for('bill_groups.create') }}">
+            <input type="hidden" id="modalProfileId" name="profile_id" value="">
+            
+            <div class="input-group">
+                <label>Profile</label>
+                <input type="text" id="modalProfileName" readonly style="background: var(--bg-secondary); cursor: not-allowed;">
+            </div>
+            
+            <div class="input-group">
+                <label>Month Name</label>
+                <input type="text" id="billGroupName" name="name" required placeholder="e.g., January 2026">
+                <small>You can customize this name - it doesn't have to match actual months</small>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Create Monthly Period</button>
+        </form>
+    </div>
+</div>
+
+<script>
+const profiles = {{ profiles_json|tojson }};
+
+function openNewBillGroupModal(profileId, profileName) {
+    // Set the profile
+    document.getElementById('modalProfileId').value = profileId;
+    document.getElementById('modalProfileName').value = profileName;
+    
+    // Auto-fill with current month
+    const now = new Date();
+    const monthNames = ["January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"];
+    const currentMonth = monthNames[now.getMonth()] + " " + now.getFullYear();
+    
+    document.getElementById('billGroupName').value = currentMonth;
+    
+    openModal('newBillGroupModal');
+}
+
+// Make function available globally
+window.openNewBillGroupModal = openNewBillGroupModal;
+</script>
+{% endblock %}

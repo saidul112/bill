@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Create Profile - Bill Splitter{% endblock %}
+
+{% block content %}
+<div class="container main-content">
+    <div class="form-container">
+        <h1>Create New Profile</h1>
+        <p class="subtitle">Set up a new roommate group for bill splitting</p>
+        
+        <form method="POST" action="{{ url_for('profiles.create') }}">
+            <div class="input-group">
+                <label>Profile Name</label>
+                <input type="text" name="name" placeholder="e.g., Apartment 101, House Share" required autofocus>
+            </div>
+            
+            <div class="btn-group">
+                <button type="submit" class="btn btn-primary">Create Profile</button>
+                <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
